@@ -1,5 +1,14 @@
-
 @import "tailwindcss";
+
+@theme {
+  --color-ink: #0a0a0a;
+  --color-paper: #f4f4f0;
+  --color-pink: #ff1f6f;
+
+  --font-display: "Bebas Neue", "Arial Narrow", sans-serif;
+  --font-body: "Inter", system-ui, sans-serif;
+  --font-mono: "Space Mono", ui-monospace, monospace;
+}
 
 * {
   box-sizing: border-box;
@@ -11,7 +20,126 @@ body,
   min-height: 100%;
 }
 
-body {
-  margin: 0;
+html {
+  background: #0a0a0a;
 }
 
+body {
+  margin: 0;
+  background: #0a0a0a;
+  color: #f4f4f0;
+  font-family: "Inter", system-ui, sans-serif;
+  font-feature-settings: "ss01", "cv11";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  overflow-x: hidden;
+}
+
+::selection {
+  background: #ff1f6f;
+  color: #0a0a0a;
+}
+
+/* Decorative dot-grid texture used as a subtle layer. */
+.bg-dotgrid {
+  background-image: radial-gradient(
+    rgba(244, 244, 240, 0.08) 1px,
+    transparent 1px
+  );
+  background-size: 22px 22px;
+}
+
+/* Scanline grain — keeps the dark canvas from feeling flat. */
+.bg-grain::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: repeating-linear-gradient(
+    0deg,
+    rgba(255, 255, 255, 0.012) 0px,
+    rgba(255, 255, 255, 0.012) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  mix-blend-mode: overlay;
+}
+
+/* Concentric ring pulse — slow, ambient. */
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.96);
+    opacity: 0.55;
+  }
+  50% {
+    transform: scale(1);
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(0.96);
+    opacity: 0.55;
+  }
+}
+.anim-pulse-ring {
+  animation: pulse-ring 7s ease-in-out infinite;
+  transform-origin: center;
+}
+
+/* Equalizer bars (the headphone mark). */
+@keyframes eq {
+  0%, 100% {
+    transform: scaleY(0.45);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+.anim-eq {
+  transform-origin: center;
+  animation: eq 1.2s ease-in-out infinite;
+}
+
+/* Staggered rise-in for type. */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.anim-rise {
+  opacity: 0;
+  animation: rise 0.9s cubic-bezier(0.2, 0.7, 0.1, 1) forwards;
+}
+
+/* Slow horizontal sweep for the status line. */
+@keyframes blink {
+  0%, 60% {
+    opacity: 1;
+  }
+  61%, 100% {
+    opacity: 0.25;
+  }
+}
+.anim-blink {
+  animation: blink 1.6s steps(2, end) infinite;
+}
+
+/* Type accents */
+.kerned {
+  letter-spacing: 0.28em;
+}
+.tight {
+  letter-spacing: -0.02em;
+}
+
+/* Pink vertical accent line used by the brand system */
+.pink-rule {
+  width: 2px;
+  background: #ff1f6f;
+  align-self: stretch;
+}
