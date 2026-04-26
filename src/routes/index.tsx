@@ -52,7 +52,7 @@ function Home() {
       <CornerStamp />
 
       {/* HERO CONTENT */}
-      <section className="relative z-10 flex min-h-[calc(100svh-90px)] flex-col items-start justify-center px-5 pt-10 pb-24 sm:px-10 sm:pt-0 sm:pb-32">
+      <section className="relative z-10 flex min-h-[calc(100svh-90px)] flex-col items-start justify-center px-5 pt-10 pb-24 sm:px-10 sm:pt-10 sm:pb-32">
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-10 sm:gap-14">
           {/* Eyebrow */}
           <div
