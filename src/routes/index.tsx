@@ -16,9 +16,15 @@ const NEXT_EVENT = {
   dayOfMonth: '16',
   year: '2026',
   startTime: '1:45 PM',
-  endTime: '6:00 PM',
-  venue: 'CTGMT',
-  host: 'CITRICACID',
+  venue: 'PRIMITIVE COFFEE CO',
+  venueUrl: 'https://www.primitivecoffee.co/',
+  // Calendar payload — Nashville, TN. CDT (UTC-5) on 2026-05-16.
+  // 1:45 PM CDT → 18:45 UTC, 6:00 PM CDT → 23:00 UTC.
+  isoStart: '20260516T184500Z',
+  isoEnd: '20260516T230000Z',
+  summary: 'BYOHP Silent Disco — Installment III',
+  calendarDescription:
+    'Free silent-disco transmission. Bring your headphones, tips split three ways.',
   going: 5,
   capacity: 40,
   rsvpUrl: 'https://partiful.com/e/1xRCpjbcKQPkxkjNFTZ9?c=WxeYVy5w',
@@ -243,19 +249,30 @@ function EventSection() {
             </div>
 
             {/* Meta grid */}
-            <dl className="grid gap-6 sm:grid-cols-3 sm:gap-8">
+            <dl className="grid gap-6 sm:grid-cols-2 sm:gap-8">
               <Meta
                 label="WHEN"
                 value={
-                  <>
+                  <span className="inline-flex items-center gap-3">
                     {e.startTime}
-                    <span className="px-1 text-pink">→</span>
-                    {e.endTime}
-                  </>
+                    <CalendarTrigger />
+                  </span>
                 }
               />
-              <Meta label="WHERE" value={e.venue} />
-              <Meta label="HOST" value={e.host} />
+              <Meta
+                label="WHERE"
+                value={
+                  <a
+                    href={e.venueUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="group/venue relative inline-block transition-colors hover:text-pink"
+                  >
+                    {e.venue}
+                    <span className="absolute -bottom-1 left-0 h-px w-0 bg-pink transition-all duration-300 group-hover/venue:w-full" />
+                  </a>
+                }
+              />
             </dl>
 
             {/* Capacity */}
@@ -391,6 +408,108 @@ function Capacity({
         ))}
       </div>
     </div>
+  )
+}
+
+function CalendarTrigger() {
+  const e = NEXT_EVENT
+  const gcalUrl =
+    'https://calendar.google.com/calendar/render?' +
+    new URLSearchParams({
+      action: 'TEMPLATE',
+      text: e.summary,
+      dates: `${e.isoStart}/${e.isoEnd}`,
+      details: `${e.calendarDescription}\n\nRSVP: ${e.rsvpUrl}`,
+      location: 'Primitive Coffee Co, Nashville, TN',
+    }).toString()
+
+  const ics = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//BYOHP//Site//EN',
+    'CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH',
+    'BEGIN:VEVENT',
+    `UID:byohp-silent-disco-${e.isoStart}@byohp.co`,
+    `DTSTAMP:${e.isoStart}`,
+    `DTSTART:${e.isoStart}`,
+    `DTEND:${e.isoEnd}`,
+    `SUMMARY:${e.summary}`,
+    'LOCATION:Primitive Coffee Co\\, Nashville\\, TN',
+    `DESCRIPTION:${e.calendarDescription} RSVP: ${e.rsvpUrl}`,
+    `URL:${e.rsvpUrl}`,
+    'END:VEVENT',
+    'END:VCALENDAR',
+  ].join('\r\n')
+
+  const icsHref = `data:text/calendar;charset=utf-8,${encodeURIComponent(ics)}`
+
+  // Close <details> after the user picks an option.
+  const closeOnClick = (
+    ev: React.MouseEvent<HTMLAnchorElement>,
+  ) => {
+    ev.currentTarget.closest('details')?.removeAttribute('open')
+  }
+
+  return (
+    <details className="group/cal relative inline-block align-middle">
+      <summary
+        aria-label="Add to calendar"
+        title="Add to calendar"
+        className="flex h-9 w-9 cursor-pointer list-none items-center justify-center border border-paper/20 text-paper/70 transition-colors hover:border-pink hover:text-pink focus-visible:border-pink focus-visible:text-pink focus-visible:outline-none [&::-webkit-details-marker]:hidden"
+      >
+        <CalendarGlyph className="h-4 w-4" />
+      </summary>
+      <div className="absolute top-full left-0 z-30 mt-2 flex w-56 flex-col border border-paper/20 bg-ink/95 shadow-2xl backdrop-blur-md">
+        <span
+          aria-hidden
+          className="border-b border-paper/10 px-4 py-2.5 font-mono text-[9px] tracking-[0.32em] text-paper/40"
+        >
+          ADD TO CALENDAR
+        </span>
+        <a
+          href={gcalUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={closeOnClick}
+          className="flex items-center gap-3 px-4 py-3 font-mono text-[10px] tracking-[0.28em] text-paper/85 transition-colors hover:bg-pink/10 hover:text-pink"
+        >
+          <span className="h-px w-3 bg-pink" aria-hidden />
+          GOOGLE CALENDAR
+          <ArrowOut className="ml-auto h-3 w-3" />
+        </a>
+        <a
+          href={icsHref}
+          download="byohp-silent-disco.ics"
+          onClick={closeOnClick}
+          className="flex items-center gap-3 border-t border-paper/10 px-4 py-3 font-mono text-[10px] tracking-[0.28em] text-paper/85 transition-colors hover:bg-pink/10 hover:text-pink"
+        >
+          <span className="h-px w-3 bg-pink" aria-hidden />
+          APPLE / .ICS FILE
+          <ArrowOut className="ml-auto h-3 w-3" />
+        </a>
+      </div>
+    </details>
+  )
+}
+
+function CalendarGlyph({ className = '' }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <rect x="3" y="5" width="18" height="16" rx="1.5" />
+      <path d="M3 10 H21" />
+      <path d="M8 3 V7" />
+      <path d="M16 3 V7" />
+      <circle cx="12" cy="15" r="0.9" fill="currentColor" stroke="none" />
+    </svg>
   )
 }
 
