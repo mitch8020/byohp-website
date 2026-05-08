@@ -298,8 +298,23 @@ function StatusFooter() {
           />
           <span>BROADCASTING SOON</span>
         </div>
-        <div className="hidden font-mono text-[10px] tracking-[0.28em] text-paper/45 sm:block sm:text-[11px]">
-          BYOHP<span className="text-pink">.CO</span>
+        <div className="hidden items-center gap-2 font-mono text-[10px] tracking-[0.28em] text-paper/45 sm:flex sm:text-[11px]">
+          <span>
+            BYOHP<span className="text-pink">.CO</span>
+          </span>
+          <span className="text-paper/25">/</span>
+          <span>
+            BY{' '}
+            <a
+              href="https://jpmitra.netlify.app/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="relative text-paper/70 transition-colors hover:text-pink"
+            >
+              JPM
+              <span className="absolute -bottom-0.5 left-0 h-px w-0 bg-pink transition-all duration-300 hover:w-full" />
+            </a>
+          </span>
         </div>
         <div className="font-mono text-[10px] tracking-[0.28em] text-paper/55 sm:text-[11px]">
           <span className="text-paper/35">©</span> MMXXVI
