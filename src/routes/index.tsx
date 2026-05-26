@@ -232,6 +232,7 @@ function HeroSection({ transmissionNumber }: { transmissionNumber: string }) {
 
 function EventSection({ event }: { event: UpcomingEvent }) {
   const remaining = EVENT_EXTRAS.capacity - EVENT_EXTRAS.going
+  const rsvpUrl = event.rsvpUrl ?? EVENT_EXTRAS.rsvpUrl
 
   return (
     <section
@@ -331,7 +332,7 @@ function EventSection({ event }: { event: UpcomingEvent }) {
             />
 
             {/* CTA */}
-            <RsvpButton href={EVENT_EXTRAS.rsvpUrl} />
+            <RsvpButton href={rsvpUrl} />
           </div>
         </div>
       </div>
@@ -652,6 +653,7 @@ function CalendarTrigger({ event }: { event: UpcomingEvent }) {
   const isoEnd = isoToIcalZulu(event.endIso)
   const title = eventSummaryWithInstallment(event)
   const locationDisplay = event.location ?? 'Nashville, TN'
+  const rsvpUrl = event.rsvpUrl ?? EVENT_EXTRAS.rsvpUrl
 
   const gcalUrl =
     'https://calendar.google.com/calendar/render?' +
@@ -659,7 +661,7 @@ function CalendarTrigger({ event }: { event: UpcomingEvent }) {
       action: 'TEMPLATE',
       text: title,
       dates: `${isoStart}/${isoEnd}`,
-      details: `${EVENT_EXTRAS.calendarDescription}\n\nRSVP: ${EVENT_EXTRAS.rsvpUrl}`,
+      details: `${EVENT_EXTRAS.calendarDescription}\n\nRSVP: ${rsvpUrl}`,
       location: locationDisplay,
     }).toString()
 
@@ -676,8 +678,8 @@ function CalendarTrigger({ event }: { event: UpcomingEvent }) {
     `DTEND:${isoEnd}`,
     `SUMMARY:${icsEscape(title)}`,
     `LOCATION:${icsEscape(locationDisplay)}`,
-    `DESCRIPTION:${icsEscape(`${EVENT_EXTRAS.calendarDescription} RSVP: ${EVENT_EXTRAS.rsvpUrl}`)}`,
-    `URL:${EVENT_EXTRAS.rsvpUrl}`,
+    `DESCRIPTION:${icsEscape(`${EVENT_EXTRAS.calendarDescription} RSVP: ${rsvpUrl}`)}`,
+    `URL:${rsvpUrl}`,
     'END:VEVENT',
     'END:VCALENDAR',
   ].join('\r\n')

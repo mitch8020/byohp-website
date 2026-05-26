@@ -38,6 +38,9 @@ export type UpcomingEvent = {
   // Silent disco only — null otherwise.
   installmentNumber: number | null
   installmentRoman: string | null
+  // Parsed from the calendar event's description; falls back to the
+  // site-wide default RSVP URL when null.
+  rsvpUrl: string | null
   // Pre-formatted display strings, all in EVENT_TZ for SSR/CSR stability.
   dayOfWeek: string // SAT
   monthAbbr: string // JUN
@@ -114,10 +117,24 @@ function venueNameFromLocation(loc: string | null): string | null {
   return loc.split(',')[0].trim().toUpperCase()
 }
 
+// Pull the first https://partiful.com/... URL out of a free-text
+// description. Stops at whitespace, quotes, or closing brackets so we
+// don't capture trailing punctuation that the user may have written
+// right after the link.
+function extractPartifulUrl(text: string | null): string | null {
+  if (!text) return null
+  const m = text.match(/https:\/\/partiful\.com\/[^\s<>"')]+/i)
+  if (!m) return null
+  // Strip trailing sentence punctuation that the user likely didn't
+  // mean to include in the URL ("…rsvp here: <url>.").
+  return m[0].replace(/[.,;!?]+$/, '')
+}
+
 type RawInstance = {
   uid: string
   summary: string
   location: string | null
+  description: string | null
   startUtc: Date
   endUtc: Date
 }
@@ -162,6 +179,7 @@ function expandInstances(icsText: string, now: Date): RawInstance[] {
       uid,
       summary: ev.summary || '',
       location: ev.location,
+      description: ev.description,
       startUtc: startJs,
       endUtc: endTime.toJSDate(),
     })
@@ -250,6 +268,7 @@ function parseUpcoming(icsText: string, now: Date): UpcomingEvent[] {
       installmentNumber,
       installmentRoman:
         installmentNumber != null ? toRoman(installmentNumber) : null,
+      rsvpUrl: extractPartifulUrl(inst.description),
       ...formatted,
     })
   }
@@ -270,6 +289,7 @@ const FALLBACK: CalendarData = {
     venueUrl: 'https://www.primitivecoffee.co/',
     installmentNumber: 4,
     installmentRoman: 'IV',
+    rsvpUrl: null,
     dayOfWeek: 'SAT',
     monthAbbr: 'JUN',
     dayOfMonth: '20',
