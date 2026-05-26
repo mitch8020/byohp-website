@@ -30,6 +30,15 @@ const NEXT_EVENT = {
   rsvpUrl: 'https://partiful.com/e/1xRCpjbcKQPkxkjNFTZ9?c=WxeYVy5w',
 }
 
+// Schedule of upcoming-or-current events. Add a new entry each time an
+// event gets scheduled; the corner-stamp transmission number derives
+// from this list. Once an event's end time passes, the stamp auto-
+// advances to the next entry (or one beyond the last if no future
+// event has been added yet).
+const EVENT_SCHEDULE: ReadonlyArray<{ number: number; endsAtIso: string }> = [
+  { number: 3, endsAtIso: '20260516T230000Z' }, // May 16, 2026, 6:00 PM CDT
+]
+
 function Home() {
   return (
     <main className="relative w-full overflow-x-hidden bg-ink text-paper">
@@ -604,6 +613,29 @@ function Corner({ className = '' }: { className?: string }) {
   )
 }
 
+// Parse iCal-style UTC stamps like "20260516T230000Z" into a Date.
+function parseIcalZulu(s: string): Date {
+  const m = s.match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/)
+  if (!m) return new Date(NaN)
+  return new Date(`${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:${m[6]}Z`)
+}
+
+// Corner-stamp transmission number = next-upcoming event's number.
+// Once that event's end time passes, the stamp advances to the next
+// schedule entry — or one beyond the last known entry if no future
+// event has been added yet.
+function currentTransmissionNumber(now: Date = new Date()): string {
+  const upcoming = EVENT_SCHEDULE.find(
+    (e) => parseIcalZulu(e.endsAtIso) > now,
+  )
+  const n = upcoming
+    ? upcoming.number
+    : EVENT_SCHEDULE.length > 0
+      ? EVENT_SCHEDULE[EVENT_SCHEDULE.length - 1].number + 1
+      : 1
+  return String(n).padStart(3, '0')
+}
+
 function CornerStamp() {
   return (
     <div className="pointer-events-none absolute top-20 right-5 z-10 hidden flex-col items-end gap-1 sm:top-24 sm:right-10 sm:flex">
@@ -615,7 +647,9 @@ function CornerStamp() {
           NO.
         </span>
         <span className="w-px bg-pink" aria-hidden />
-        <span className="font-display text-3xl leading-none text-pink">001</span>
+        <span className="font-display text-3xl leading-none text-pink">
+          {currentTransmissionNumber()}
+        </span>
       </div>
     </div>
   )
