@@ -10,24 +10,24 @@ const LINKS = {
 
 const NEXT_EVENT = {
   title: 'BYOHP SILENT DISCO',
-  installment: 'III', // third installment
+  installment: 'IV', // fourth installment
   dayOfWeek: 'SAT',
-  monthAbbr: 'MAY',
-  dayOfMonth: '16',
+  monthAbbr: 'JUN',
+  dayOfMonth: '20',
   year: '2026',
   startTime: '1:45 PM',
   venue: 'PRIMITIVE COFFEE CO',
   venueUrl: 'https://www.primitivecoffee.co/',
-  // Calendar payload — Nashville, TN. CDT (UTC-5) on 2026-05-16.
+  // Calendar payload — Nashville, TN. CDT (UTC-5) on 2026-06-20.
   // 1:45 PM CDT → 18:45 UTC, 6:00 PM CDT → 23:00 UTC.
-  isoStart: '20260516T184500Z',
-  isoEnd: '20260516T230000Z',
-  summary: 'BYOHP Silent Disco — Installment III',
+  isoStart: '20260620T184500Z',
+  isoEnd: '20260620T230000Z',
+  summary: 'BYOHP Silent Disco — Installment IV',
   calendarDescription:
-    'Free silent-disco transmission. Bring your headphones, tips split three ways.',
+    'Free silent-disco transmission. Bring your headphones',
   going: 5,
   capacity: 40,
-  rsvpUrl: 'https://partiful.com/e/1xRCpjbcKQPkxkjNFTZ9?c=WxeYVy5w',
+  rsvpUrl: 'https://partiful.com/e/kpAJHZRGOSHbMyA7mPvM',
 }
 
 // Schedule of upcoming-or-current events. Add a new entry each time an
@@ -36,7 +36,7 @@ const NEXT_EVENT = {
 // advances to the next entry (or one beyond the last if no future
 // event has been added yet).
 const EVENT_SCHEDULE: ReadonlyArray<{ number: number; endsAtIso: string }> = [
-  { number: 3, endsAtIso: '20260516T230000Z' }, // May 16, 2026, 6:00 PM CDT
+  { number: 4, endsAtIso: '20260620T230000Z' }, // Jun 20, 2026, 6:00 PM CDT
 ]
 
 function Home() {
@@ -251,8 +251,7 @@ function EventSection() {
                 </span>
               </h2>
               <p className="mt-5 max-w-md text-sm leading-relaxed text-paper/65 sm:text-[15px]">
-                Third installment. Headphones in. Speakers off. Tips split
-                three ways. Show up, dance on the block, leave it warmer
+                Fourth installment. Headphones in. Speakers off. Show up, dance on the block, leave it warmer
                 than you found it.
               </p>
             </div>
@@ -613,7 +612,7 @@ function Corner({ className = '' }: { className?: string }) {
   )
 }
 
-// Parse iCal-style UTC stamps like "20260516T230000Z" into a Date.
+// Parse iCal-style UTC stamps like "20260620T230000Z" into a Date.
 function parseIcalZulu(s: string): Date {
   const m = s.match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/)
   if (!m) return new Date(NaN)
