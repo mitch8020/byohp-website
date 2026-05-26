@@ -1,6 +1,11 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { fetchCalendarData } from '#/server/calendar'
+import type { UpcomingEvent } from '#/server/calendar'
 
-export const Route = createFileRoute('/')({ component: Home })
+export const Route = createFileRoute('/')({
+  loader: () => fetchCalendarData(),
+  component: Home,
+})
 
 const LINKS = {
   about: 'https://jpmitra.netlify.app/blog/byohp',
@@ -8,52 +13,78 @@ const LINKS = {
   discord: 'https://discord.gg/JpEKy5hkS',
 }
 
-const NEXT_EVENT = {
-  title: 'BYOHP SILENT DISCO',
-  installment: 'IV', // fourth installment
-  dayOfWeek: 'SAT',
-  monthAbbr: 'JUN',
-  dayOfMonth: '20',
-  year: '2026',
-  startTime: '1:45 PM',
-  venue: 'PRIMITIVE COFFEE CO',
-  venueUrl: 'https://www.primitivecoffee.co/',
-  // Calendar payload — Nashville, TN. CDT (UTC-5) on 2026-06-20.
-  // 1:45 PM CDT → 18:45 UTC, 6:00 PM CDT → 23:00 UTC.
-  isoStart: '20260620T184500Z',
-  isoEnd: '20260620T230000Z',
-  summary: 'BYOHP Silent Disco — Installment IV',
-  calendarDescription:
-    'Free silent-disco transmission. Bring your headphones',
-  going: 5,
-  capacity: 40,
-  rsvpUrl: 'https://partiful.com/e/kpAJHZRGOSHbMyA7mPvM',
+// Subscribe URLs for the public Google Calendar.
+const CAL_CID = 'Y2x1Yi5wcm9mZXNzaW9uYWx6QGdtYWlsLmNvbQ' // base64(calendar id)
+const CAL_ICS_URL =
+  'https://calendar.google.com/calendar/ical/club.professionalz%40gmail.com/public/basic.ics'
+const SUBSCRIBE = {
+  google: `https://calendar.google.com/calendar/u/0/r?cid=${CAL_CID}`,
+  // webcal:// triggers Apple Calendar / Outlook / iOS subscribe prompts.
+  webcal: CAL_ICS_URL.replace(/^https:/, 'webcal:'),
+  public:
+    'https://calendar.google.com/calendar/embed?src=club.professionalz%40gmail.com&ctz=America%2FChicago',
 }
 
-// Schedule of upcoming-or-current events. Add a new entry each time an
-// event gets scheduled; the corner-stamp transmission number derives
-// from this list. Once an event's end time passes, the stamp auto-
-// advances to the next entry (or one beyond the last if no future
-// event has been added yet).
-const EVENT_SCHEDULE: ReadonlyArray<{ number: number; endsAtIso: string }> = [
-  { number: 4, endsAtIso: '20260620T230000Z' }, // Jun 20, 2026, 6:00 PM CDT
-]
+// Things that aren't on the Google Calendar.
+const EVENT_EXTRAS = {
+  rsvpUrl: 'https://partiful.com/e/kpAJHZRGOSHbMyA7mPvM',
+  going: 5,
+  capacity: 40,
+  calendarDescription:
+    'Free silent-disco transmission. Bring your headphones.',
+}
+
+const MAX_CALENDAR_ROWS = 6
 
 function Home() {
+  const data = Route.useLoaderData()
+  const next = data.nextSilentDisco
+  const transmissionNumber = next?.installmentNumber
+    ? pad3(next.installmentNumber)
+    : '—'
+
   return (
     <main className="relative w-full overflow-x-hidden bg-ink text-paper">
-      <HeroSection />
-      <EventSection />
+      <HeroSection transmissionNumber={transmissionNumber} />
+      {next && <EventSection event={next} />}
+      <CalendarSection upcoming={data.upcoming} fallback={data.status === 'fallback'} />
       <StatusFooter />
     </main>
   )
 }
 
 /* -------------------------------------------------------------------------- */
+/*  Helpers                                                                   */
+/* -------------------------------------------------------------------------- */
+
+function pad3(n: number): string {
+  return String(n).padStart(3, '0')
+}
+
+// "2026-06-20T18:45:00.000Z" → "20260620T184500Z" (iCal/Google form).
+function isoToIcalZulu(iso: string): string {
+  const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})/)
+  if (!m) return ''
+  return `${m[1]}${m[2]}${m[3]}T${m[4]}${m[5]}${m[6]}Z`
+}
+
+// Escape commas and semicolons per RFC 5545 for ICS TEXT properties.
+function icsEscape(s: string): string {
+  return s.replace(/\\/g, '\\\\').replace(/,/g, '\\,').replace(/;/g, '\\;')
+}
+
+function eventSummaryWithInstallment(event: UpcomingEvent): string {
+  if (event.kind === 'silent-disco' && event.installmentRoman) {
+    return `${event.summary} — Installment ${event.installmentRoman}`
+  }
+  return event.summary
+}
+
+/* -------------------------------------------------------------------------- */
 /*  Sections                                                                  */
 /* -------------------------------------------------------------------------- */
 
-function HeroSection() {
+function HeroSection({ transmissionNumber }: { transmissionNumber: string }) {
   return (
     <section className="bg-grain relative flex min-h-svh w-full flex-col overflow-hidden">
       {/* Top-edge hairline */}
@@ -93,7 +124,7 @@ function HeroSection() {
         </a>
       </header>
 
-      <CornerStamp />
+      <CornerStamp number={transmissionNumber} />
 
       {/* Hero content fills remaining vertical space */}
       <div className="relative z-10 flex flex-1 flex-col items-start justify-center px-5 pt-12 pb-20 sm:px-10 sm:pt-12 sm:pb-24">
@@ -199,9 +230,8 @@ function HeroSection() {
   )
 }
 
-function EventSection() {
-  const e = NEXT_EVENT
-  const remaining = e.capacity - e.going
+function EventSection({ event }: { event: UpcomingEvent }) {
+  const remaining = EVENT_EXTRAS.capacity - EVENT_EXTRAS.going
 
   return (
     <section
@@ -224,18 +254,22 @@ function EventSection() {
           <span className="h-px w-8 bg-pink sm:w-12" aria-hidden />
           <span className="font-mono text-[10px] tracking-[0.32em] text-paper/70 sm:text-xs">
             NEXT TRANSMISSION
-            <span className="mx-2 text-pink">/</span>
-            INSTALLMENT {e.installment}
+            {event.installmentRoman && (
+              <>
+                <span className="mx-2 text-pink">/</span>
+                INSTALLMENT {event.installmentRoman}
+              </>
+            )}
           </span>
         </div>
 
         <div className="mt-12 grid gap-12 sm:mt-16 sm:grid-cols-[auto_1fr] sm:gap-x-16 sm:gap-y-12">
           {/* Date stamp */}
           <DateStamp
-            dayOfWeek={e.dayOfWeek}
-            monthAbbr={e.monthAbbr}
-            dayOfMonth={e.dayOfMonth}
-            year={e.year}
+            dayOfWeek={event.dayOfWeek}
+            monthAbbr={event.monthAbbr}
+            dayOfMonth={event.dayOfMonth}
+            year={event.year}
           />
 
           {/* Details */}
@@ -251,8 +285,8 @@ function EventSection() {
                 </span>
               </h2>
               <p className="mt-5 max-w-md text-sm leading-relaxed text-paper/65 sm:text-[15px]">
-                Fourth installment. Headphones in. Speakers off. Show up, dance on the block, leave it warmer
-                than you found it.
+                Headphones in. Speakers off. Show up, dance on the block,
+                leave it warmer than you found it.
               </p>
             </div>
 
@@ -262,36 +296,215 @@ function EventSection() {
                 label="WHEN"
                 value={
                   <span className="inline-flex items-center gap-3">
-                    {e.startTime}
-                    <CalendarTrigger />
+                    {event.startTimeDisplay}
+                    <CalendarTrigger event={event} />
                   </span>
                 }
               />
-              <Meta
-                label="WHERE"
-                value={
-                  <a
-                    href={e.venueUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="group/venue relative inline-block transition-colors hover:text-pink"
-                  >
-                    {e.venue}
-                    <span className="absolute -bottom-1 left-0 h-px w-0 bg-pink transition-all duration-300 group-hover/venue:w-full" />
-                  </a>
-                }
-              />
+              {event.venueName && (
+                <Meta
+                  label="WHERE"
+                  value={
+                    event.venueUrl ? (
+                      <a
+                        href={event.venueUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="group/venue relative inline-block transition-colors hover:text-pink"
+                      >
+                        {event.venueName}
+                        <span className="absolute -bottom-1 left-0 h-px w-0 bg-pink transition-all duration-300 group-hover/venue:w-full" />
+                      </a>
+                    ) : (
+                      event.venueName
+                    )
+                  }
+                />
+              )}
             </dl>
 
             {/* Capacity */}
-            <Capacity going={e.going} total={e.capacity} remaining={remaining} />
+            <Capacity
+              going={EVENT_EXTRAS.going}
+              total={EVENT_EXTRAS.capacity}
+              remaining={remaining}
+            />
 
             {/* CTA */}
-            <RsvpButton href={e.rsvpUrl} />
+            <RsvpButton href={EVENT_EXTRAS.rsvpUrl} />
           </div>
         </div>
       </div>
     </section>
+  )
+}
+
+function CalendarSection({
+  upcoming,
+  fallback,
+}: {
+  upcoming: UpcomingEvent[]
+  fallback: boolean
+}) {
+  const rows = upcoming.slice(0, MAX_CALENDAR_ROWS)
+  return (
+    <section
+      id="event-calendar"
+      className="relative w-full border-t border-paper/10 px-5 py-20 sm:px-10 sm:py-28"
+    >
+      <div className="bg-dotgrid absolute inset-0 opacity-20" aria-hidden />
+
+      <div className="relative z-10 mx-auto max-w-6xl">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between sm:gap-8">
+          <div>
+            <div className="flex items-center gap-3">
+              <span className="h-px w-8 bg-pink sm:w-12" aria-hidden />
+              <span className="font-mono text-[10px] tracking-[0.32em] text-paper/70 sm:text-xs">
+                EVENT CALENDAR
+                <span className="mx-2 text-pink">/</span>
+                {rows.length > 0
+                  ? `${rows.length} UPCOMING`
+                  : 'NO UPCOMING EVENTS'}
+              </span>
+            </div>
+            <h2 className="mt-5 tight font-display leading-[0.88] text-paper text-[clamp(2.2rem,5.5vw,4rem)]">
+              ON THE <span className="text-pink">AIR.</span>
+            </h2>
+          </div>
+          <p className="max-w-sm text-sm leading-relaxed text-paper/60 sm:text-[15px]">
+            Subscribe to the calendar so the next transmission lands in
+            your pocket — no app, no email blast.
+          </p>
+        </div>
+
+        {/* Event list */}
+        {rows.length > 0 ? (
+          <ul className="mt-10 flex flex-col border-t border-paper/15 sm:mt-14">
+            {rows.map((e) => (
+              <li key={e.uid}>
+                <CalendarRow event={e} />
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="mt-10 font-mono text-xs tracking-[0.28em] text-paper/45">
+            CHECK BACK SOON.
+          </p>
+        )}
+
+        {/* Subscribe block */}
+        <SubscribeBlock />
+
+        {fallback && (
+          <p className="mt-6 font-mono text-[10px] tracking-[0.24em] text-paper/35">
+            <span className="text-pink">●</span> LIVE FEED UNAVAILABLE — SHOWING
+            CACHED INFO.
+          </p>
+        )}
+      </div>
+    </section>
+  )
+}
+
+function CalendarRow({ event }: { event: UpcomingEvent }) {
+  const isDisco = event.kind === 'silent-disco'
+  return (
+    <div className="group/row flex flex-col gap-3 border-b border-paper/15 py-6 transition-colors hover:bg-paper/[0.015] sm:flex-row sm:items-center sm:gap-8 sm:py-7">
+      {/* Compact date stamp */}
+      <div className="flex items-stretch gap-3 sm:w-40">
+        <div className="flex flex-col justify-between py-0.5 font-mono text-[9px] tracking-[0.32em] text-paper/55 sm:text-[10px]">
+          <span>{event.dayOfWeek}</span>
+          <span className="text-paper/35">{event.year}</span>
+        </div>
+        <span className="w-px self-stretch bg-pink" aria-hidden />
+        <div className="flex items-baseline gap-2 font-display leading-none">
+          <span
+            className={
+              'text-4xl ' + (isDisco ? 'text-pink' : 'text-paper')
+            }
+          >
+            {event.dayOfMonth}
+          </span>
+          <span className="text-xl text-paper/70 tracking-wide">
+            {event.monthAbbr}
+          </span>
+        </div>
+      </div>
+
+      {/* Kind + title + venue */}
+      <div className="flex flex-1 flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-6">
+        <span
+          className={
+            'inline-flex w-fit items-center gap-2 font-mono text-[9px] tracking-[0.32em] sm:text-[10px] ' +
+            (isDisco ? 'text-pink' : 'text-paper/60')
+          }
+        >
+          <span
+            aria-hidden
+            className={
+              'h-1.5 w-1.5 ' + (isDisco ? 'bg-pink' : 'bg-paper/55')
+            }
+          />
+          {isDisco ? 'SILENT DISCO' : 'MOVIE NIGHT'}
+          {event.installmentRoman && (
+            <span className="text-paper/40">
+              <span className="mr-1 text-paper/25">/</span>
+              NO. {event.installmentNumber
+                ? pad3(event.installmentNumber)
+                : event.installmentRoman}
+            </span>
+          )}
+        </span>
+        <span className="font-display text-2xl leading-none tracking-wide text-paper sm:text-[1.6rem]">
+          {event.startTimeDisplay}
+        </span>
+        {event.venueName && (
+          <span className="font-mono text-[10px] tracking-[0.28em] text-paper/55 sm:ml-auto sm:text-[11px]">
+            {event.venueName}
+          </span>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function SubscribeBlock() {
+  return (
+    <div className="mt-12 flex flex-col gap-5 border-t border-paper/10 pt-10 sm:mt-14 sm:pt-12">
+      <div className="flex items-center gap-3">
+        <span className="h-px w-6 bg-paper/40" aria-hidden />
+        <span className="font-mono text-[10px] tracking-[0.32em] text-paper/55 sm:text-[11px]">
+          SUBSCRIBE
+        </span>
+      </div>
+
+      <ul className="flex flex-wrap items-stretch gap-3 sm:gap-4">
+        <li>
+          <SubscribeLink
+            href={SUBSCRIBE.google}
+            label="GOOGLE CALENDAR"
+            hint="ADD WITH ONE TAP"
+            icon={<CalendarGlyph />}
+          />
+        </li>
+        <li>
+          <SubscribeLink
+            href={SUBSCRIBE.webcal}
+            label="APPLE / OUTLOOK"
+            hint="VIA WEBCAL"
+            icon={<AppleGlyph />}
+          />
+        </li>
+        <li>
+          <SubscribeLink
+            href={SUBSCRIBE.public}
+            label="OPEN PUBLIC PAGE"
+            hint="VIEW IN BROWSER"
+            icon={<GlobeGlyph />}
+          />
+        </li>
+      </ul>
+    </div>
   )
 }
 
@@ -434,16 +647,20 @@ function Capacity({
   )
 }
 
-function CalendarTrigger() {
-  const e = NEXT_EVENT
+function CalendarTrigger({ event }: { event: UpcomingEvent }) {
+  const isoStart = isoToIcalZulu(event.startIso)
+  const isoEnd = isoToIcalZulu(event.endIso)
+  const title = eventSummaryWithInstallment(event)
+  const locationDisplay = event.location ?? 'Nashville, TN'
+
   const gcalUrl =
     'https://calendar.google.com/calendar/render?' +
     new URLSearchParams({
       action: 'TEMPLATE',
-      text: e.summary,
-      dates: `${e.isoStart}/${e.isoEnd}`,
-      details: `${e.calendarDescription}\n\nRSVP: ${e.rsvpUrl}`,
-      location: 'Primitive Coffee Co, Nashville, TN',
+      text: title,
+      dates: `${isoStart}/${isoEnd}`,
+      details: `${EVENT_EXTRAS.calendarDescription}\n\nRSVP: ${EVENT_EXTRAS.rsvpUrl}`,
+      location: locationDisplay,
     }).toString()
 
   const ics = [
@@ -453,24 +670,21 @@ function CalendarTrigger() {
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
     'BEGIN:VEVENT',
-    `UID:byohp-silent-disco-${e.isoStart}@byohp.co`,
-    `DTSTAMP:${e.isoStart}`,
-    `DTSTART:${e.isoStart}`,
-    `DTEND:${e.isoEnd}`,
-    `SUMMARY:${e.summary}`,
-    'LOCATION:Primitive Coffee Co\\, Nashville\\, TN',
-    `DESCRIPTION:${e.calendarDescription} RSVP: ${e.rsvpUrl}`,
-    `URL:${e.rsvpUrl}`,
+    `UID:byohp-silent-disco-${isoStart}@byohp.co`,
+    `DTSTAMP:${isoStart}`,
+    `DTSTART:${isoStart}`,
+    `DTEND:${isoEnd}`,
+    `SUMMARY:${icsEscape(title)}`,
+    `LOCATION:${icsEscape(locationDisplay)}`,
+    `DESCRIPTION:${icsEscape(`${EVENT_EXTRAS.calendarDescription} RSVP: ${EVENT_EXTRAS.rsvpUrl}`)}`,
+    `URL:${EVENT_EXTRAS.rsvpUrl}`,
     'END:VEVENT',
     'END:VCALENDAR',
   ].join('\r\n')
 
   const icsHref = `data:text/calendar;charset=utf-8,${encodeURIComponent(ics)}`
 
-  // Close <details> after the user picks an option.
-  const closeOnClick = (
-    ev: React.MouseEvent<HTMLAnchorElement>,
-  ) => {
+  const closeOnClick = (ev: React.MouseEvent<HTMLAnchorElement>) => {
     ev.currentTarget.closest('details')?.removeAttribute('open')
   }
 
@@ -503,7 +717,7 @@ function CalendarTrigger() {
         </a>
         <a
           href={icsHref}
-          download="byohp-silent-disco.ics"
+          download={`byohp-${isoStart.slice(0, 8)}.ics`}
           onClick={closeOnClick}
           className="flex items-center gap-3 border-t border-paper/10 px-4 py-3 font-mono text-[10px] tracking-[0.28em] text-paper/85 transition-colors hover:bg-pink/10 hover:text-pink"
         >
@@ -513,26 +727,6 @@ function CalendarTrigger() {
         </a>
       </div>
     </details>
-  )
-}
-
-function CalendarGlyph({ className = '' }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      className={className}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <rect x="3" y="5" width="18" height="16" rx="1.5" />
-      <path d="M3 10 H21" />
-      <path d="M8 3 V7" />
-      <path d="M16 3 V7" />
-      <circle cx="12" cy="15" r="0.9" fill="currentColor" stroke="none" />
-    </svg>
   )
 }
 
@@ -554,6 +748,45 @@ function RsvpButton({ href }: { href: string }) {
         <ArrowOut className="h-3.5 w-3.5" />
       </a>
     </div>
+  )
+}
+
+function SubscribeLink({
+  href,
+  label,
+  hint,
+  icon,
+}: {
+  href: string
+  label: string
+  hint: string
+  icon: React.ReactNode
+}) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="group relative flex items-center gap-4 border border-paper/15 bg-paper/[0.02] px-5 py-4 transition-all duration-300 hover:border-pink hover:bg-pink/5 sm:px-6 sm:py-5"
+    >
+      <Corner className="-top-px -left-px" />
+      <Corner className="-top-px -right-px rotate-90" />
+      <Corner className="-right-px -bottom-px rotate-180" />
+      <Corner className="-bottom-px -left-px -rotate-90" />
+
+      <span className="flex h-8 w-8 items-center justify-center text-paper transition-colors duration-300 group-hover:text-pink sm:h-9 sm:w-9">
+        {icon}
+      </span>
+      <span className="flex flex-col">
+        <span className="font-mono text-[9px] tracking-[0.32em] text-paper/50 transition-colors duration-300 group-hover:text-pink/80 sm:text-[10px]">
+          {hint}
+        </span>
+        <span className="font-display text-base leading-none tracking-wide text-paper transition-colors duration-300 sm:text-lg">
+          {label}
+        </span>
+      </span>
+      <ArrowOut className="ml-2 h-3 w-3 text-paper/40 transition-all duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-pink" />
+    </a>
   )
 }
 
@@ -612,30 +845,7 @@ function Corner({ className = '' }: { className?: string }) {
   )
 }
 
-// Parse iCal-style UTC stamps like "20260620T230000Z" into a Date.
-function parseIcalZulu(s: string): Date {
-  const m = s.match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/)
-  if (!m) return new Date(NaN)
-  return new Date(`${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:${m[6]}Z`)
-}
-
-// Corner-stamp transmission number = next-upcoming event's number.
-// Once that event's end time passes, the stamp advances to the next
-// schedule entry — or one beyond the last known entry if no future
-// event has been added yet.
-function currentTransmissionNumber(now: Date = new Date()): string {
-  const upcoming = EVENT_SCHEDULE.find(
-    (e) => parseIcalZulu(e.endsAtIso) > now,
-  )
-  const n = upcoming
-    ? upcoming.number
-    : EVENT_SCHEDULE.length > 0
-      ? EVENT_SCHEDULE[EVENT_SCHEDULE.length - 1].number + 1
-      : 1
-  return String(n).padStart(3, '0')
-}
-
-function CornerStamp() {
+function CornerStamp({ number }: { number: string }) {
   return (
     <div className="pointer-events-none absolute top-20 right-5 z-10 hidden flex-col items-end gap-1 sm:top-24 sm:right-10 sm:flex">
       <span className="font-mono text-[10px] tracking-[0.32em] text-paper/45">
@@ -647,7 +857,7 @@ function CornerStamp() {
         </span>
         <span className="w-px bg-pink" aria-hidden />
         <span className="font-display text-3xl leading-none text-pink">
-          {currentTransmissionNumber()}
+          {number}
         </span>
       </div>
     </div>
@@ -714,6 +924,54 @@ function DiscordGlyph() {
   return (
     <svg viewBox="0 0 24 24" className="h-full w-full" fill="currentColor">
       <path d="M19.54 5.34A17.5 17.5 0 0 0 15.4 4.05a.07.07 0 0 0-.07.03c-.18.32-.38.74-.52 1.07a16.2 16.2 0 0 0-4.82 0 11.4 11.4 0 0 0-.53-1.07.07.07 0 0 0-.07-.03 17.5 17.5 0 0 0-4.14 1.29.06.06 0 0 0-.03.02C2.43 9.06 1.78 12.66 2.1 16.21a.07.07 0 0 0 .03.05 17.6 17.6 0 0 0 5.3 2.69.07.07 0 0 0 .08-.03c.41-.56.77-1.15 1.09-1.78a.07.07 0 0 0-.04-.1 11.6 11.6 0 0 1-1.66-.79.07.07 0 0 1-.01-.12c.11-.08.22-.17.33-.26a.07.07 0 0 1 .07-.01c3.48 1.59 7.25 1.59 10.69 0a.07.07 0 0 1 .07.01c.11.09.22.18.33.26a.07.07 0 0 1-.01.12c-.53.31-1.08.57-1.66.79a.07.07 0 0 0-.04.1c.33.62.69 1.21 1.09 1.78a.07.07 0 0 0 .08.03 17.55 17.55 0 0 0 5.31-2.69.07.07 0 0 0 .03-.05c.39-4.1-.65-7.66-2.74-10.85a.05.05 0 0 0-.03-.02ZM8.52 14.13c-1.04 0-1.9-.95-1.9-2.12s.84-2.12 1.9-2.12c1.07 0 1.92.96 1.9 2.12 0 1.17-.84 2.12-1.9 2.12Zm6.97 0c-1.04 0-1.9-.95-1.9-2.12s.84-2.12 1.9-2.12c1.07 0 1.92.96 1.9 2.12 0 1.17-.83 2.12-1.9 2.12Z" />
+    </svg>
+  )
+}
+
+function CalendarGlyph({ className = '' }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className={className || 'h-full w-full'}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <rect x="3" y="5" width="18" height="16" rx="1.5" />
+      <path d="M3 10 H21" />
+      <path d="M8 3 V7" />
+      <path d="M16 3 V7" />
+      <circle cx="12" cy="15" r="0.9" fill="currentColor" stroke="none" />
+    </svg>
+  )
+}
+
+function AppleGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-full w-full" fill="currentColor">
+      <path d="M16.6 12.6c0-2.6 2.1-3.8 2.2-3.9-1.2-1.8-3.1-2-3.8-2.1-1.6-.2-3.1.9-3.9.9-.8 0-2.1-.9-3.4-.9-1.7 0-3.4 1-4.3 2.6-1.8 3.2-.5 7.9 1.3 10.5.9 1.3 1.9 2.7 3.3 2.7 1.3 0 1.8-.8 3.4-.8s2 .8 3.4.8c1.4 0 2.3-1.3 3.2-2.6 1-1.5 1.4-3 1.5-3.1-.1 0-2.9-1.1-2.9-4.1Z" />
+      <path d="M13.5 4.5c.7-.8 1.2-2 1-3.2-1 .1-2.3.7-3 1.6-.7.7-1.3 2-1.1 3.1 1.2.1 2.3-.6 3.1-1.5Z" />
+    </svg>
+  )
+}
+
+function GlobeGlyph() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className="h-full w-full"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <circle cx="12" cy="12" r="9" />
+      <path d="M3 12 H21" />
+      <path d="M12 3 C 8 7 8 17 12 21" />
+      <path d="M12 3 C 16 7 16 17 12 21" />
     </svg>
   )
 }
